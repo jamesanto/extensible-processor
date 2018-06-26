@@ -1,33 +1,27 @@
 package me.socure.extensible.processor
 
-import me.socure.extensible.processor.model.UnixTimestamp
+import me.socure.extensible.processor.model.{ContextualError, ContextualOutput}
 import scalaz.zio.IO
 
-trait PostProcessor[ErrorT, InputT, OutputT] {
+trait PostProcessor[ErrorT, CtxT, InputT, OutputT] {
   def postProcess(
-                   startTime: UnixTimestamp,
-                   actualProcessStartTime: UnixTimestamp,
                    originalInput: InputT,
                    processedInput: InputT,
-                   output: OutputT): IO[ErrorT, OutputT]
+                   output: ContextualOutput[OutputT, CtxT]): IO[ContextualError[ErrorT, CtxT], ContextualOutput[OutputT, CtxT]]
 }
 
 object PostProcessor {
 
-  implicit class RichPostProcessor[ErrorT, InputT, OutputT](val value: PostProcessor[ErrorT, InputT, OutputT]) extends AnyVal {
-    def and(other: PostProcessor[ErrorT, InputT, OutputT]): PostProcessor[ErrorT, InputT, OutputT] = new PostProcessor[ErrorT, InputT, OutputT] {
-      override def postProcess(startTime: UnixTimestamp, actualProcessStartTime: UnixTimestamp, originalInput: InputT, processedInput: InputT, output: OutputT): IO[ErrorT, OutputT] = {
+  implicit class RichPostProcessor[ErrorT, CtxT, InputT, OutputT](val value: PostProcessor[ErrorT, CtxT, InputT, OutputT]) extends AnyVal {
+    def and(other: PostProcessor[ErrorT, CtxT, InputT, OutputT]): PostProcessor[ErrorT, CtxT, InputT, OutputT] = new PostProcessor[ErrorT, CtxT, InputT, OutputT] {
+      override def postProcess(originalInput: InputT, processedInput: InputT, output: ContextualOutput[OutputT, CtxT]): IO[ContextualError[ErrorT, CtxT], ContextualOutput[OutputT, CtxT]] = {
         for {
           originalResult <- value.postProcess(
-            startTime = startTime,
-            actualProcessStartTime = actualProcessStartTime,
             originalInput = originalInput,
             processedInput = processedInput,
             output = output
           )
           newResult <- other.postProcess(
-            startTime = startTime,
-            actualProcessStartTime = actualProcessStartTime,
             originalInput = originalInput,
             processedInput = processedInput,
             output = originalResult
@@ -36,7 +30,7 @@ object PostProcessor {
       }
     }
 
-    def &(other: PostProcessor[ErrorT, InputT, OutputT]): PostProcessor[ErrorT, InputT, OutputT] = and(other)
+    def &(other: PostProcessor[ErrorT, CtxT, InputT, OutputT]): PostProcessor[ErrorT, CtxT, InputT, OutputT] = and(other)
   }
 
 }

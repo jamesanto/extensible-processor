@@ -1,5 +1,7 @@
 package me.socure.extensible.processor.exp1
 
+import me.socure.extensible.processor.Processor
+import me.socure.extensible.processor.model.{TimeContext, TimingContextProcessor}
 import scalaz.zio
 import scalaz.zio.{IO, IOApp}
 
@@ -9,14 +11,15 @@ object Main extends IOApp {
         val loginInput = LoginInput("james@socure.me", "james")
 //    val loginInput = LoginInput("james@socure.me1", "james")
 
-    val processor = new LoginProcessor(expectedLogin)
+    val processor: Processor[LoginProcessingError, TimeContext, LoginInput, LoginResult] = new LoginProcessor(expectedLogin)
       .withPreProcessor(InputValidator)
       .withPostProcessor(LoginAuditor)
       .withErrorHandler(LoginAuditor)
+      .withContextProcessor(TimingContextProcessor[LoginProcessingError])
 
     val t: IO[String, Int] = null
 
-    val result = processor.process(loginInput)
+    val result = processor.process(loginInput, TimeContext.empty)
     result.attempt.map {
       case Right(res) =>
         println(s"SUCCESS : $res")

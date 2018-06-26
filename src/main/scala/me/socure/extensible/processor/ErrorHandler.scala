@@ -1,34 +1,39 @@
 package me.socure.extensible.processor
 
-import me.socure.extensible.processor.model.UnixTimestamp
+import me.socure.extensible.processor.model.{ContextualError, ContextualOutput}
 import scalaz.zio.IO
 
-trait ErrorHandler[ErrorT, InputT, OutputT] {
+trait ErrorHandler[ErrorT, CtxT, InputT, OutputT] {
   def tryRecover(
-                  startTime: UnixTimestamp,
-                  actualProcessStartTime: Option[UnixTimestamp],
                   originalInput: InputT,
                   processedInput: Option[InputT],
-                  error: ErrorT): IO[ErrorT, OutputT]
+                  originalCtx: CtxT,
+                  processedCtx: CtxT,
+                  error: ErrorT): IO[ContextualError[ErrorT, CtxT], ContextualOutput[OutputT, CtxT]]
 }
 
 object ErrorHandler {
 
-  implicit class RichErrorHandler[ErrorT, InputT, OutputT](val value: ErrorHandler[ErrorT, InputT, OutputT]) extends AnyVal {
-    def and(other: ErrorHandler[ErrorT, InputT, OutputT]): ErrorHandler[ErrorT, InputT, OutputT] = new ErrorHandler[ErrorT, InputT, OutputT] {
-      override def tryRecover(startTime: UnixTimestamp, actualProcessStartTime: Option[UnixTimestamp], originalInput: InputT, processedInput: Option[InputT], error: ErrorT): IO[ErrorT, OutputT] = {
+  implicit class RichErrorHandler[ErrorT, CtxT, InputT, OutputT](val value: ErrorHandler[ErrorT, CtxT, InputT, OutputT]) extends AnyVal {
+    def and(other: ErrorHandler[ErrorT, CtxT, InputT, OutputT]): ErrorHandler[ErrorT, CtxT, InputT, OutputT] = new ErrorHandler[ErrorT, CtxT, InputT, OutputT] {
+      override def tryRecover(
+                               originalInput: InputT,
+                               processedInput: Option[InputT],
+                               originalCtx: CtxT,
+                               processedCtx: CtxT,
+                               error: ErrorT): IO[ContextualError[ErrorT, CtxT], ContextualOutput[OutputT, CtxT]] = {
         value.tryRecover(
-          startTime = startTime,
-          actualProcessStartTime = actualProcessStartTime,
           originalInput = originalInput,
           processedInput = processedInput,
+          originalCtx = originalCtx,
+          processedCtx = processedCtx,
           error = error
         ).catchAll(newError => other.tryRecover(
-          startTime = startTime,
-          actualProcessStartTime = actualProcessStartTime,
           originalInput = originalInput,
           processedInput = processedInput,
-          error = newError
+          originalCtx = originalCtx,
+          processedCtx = newError.ctx,
+          error = newError.error
         ))
       }
     }
